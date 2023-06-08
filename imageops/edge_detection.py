@@ -1,4 +1,5 @@
 import cv2
+import numpy as np
 
 from utils.image_utils import show_image
 from utils.imgutils_copy import grab_contours
@@ -10,26 +11,26 @@ def edge_detection_prep(image):
     return cv2.Canny(blurred, 75, 200)
 
 
-def filter_contours(contours):
+def filter_and_sort_contours(contours, debug=False):
     """
-        Filters the contours to find the fist contour with 4 edges
+        Sorts the contours to find the contour with the biggest length then it returns it
     """
-    found_contour = None
+    filtered_contours = []
     for c in contours:
-        # approximate the contour
-        peri = cv2.arcLength(c, True)
-        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+        is_closed = cv2.isContourConvex(c)
+        length = cv2.arcLength(c, is_closed)
 
-        # if our approximated contour has four points, then we can
-        # assume we have found the outline of the receipt
-        if len(approx) == 4:
-            found_contour = approx
-            break
+        filtered_contours.append({
+            'length': length,
+            'contour': c,
+            'is_closed': is_closed
+        })
 
-    if found_contour is None:
-        raise Exception('Could not find the edge of the receipt')
-
-    return found_contour
+    sorted_contours = sorted(filtered_contours, key=lambda x: [x.get('length')], reverse=True)
+    if debug:
+        print(f'Sorted {len(contours)} contours')
+        print(f'Longest contour: {sorted_contours[0].get("length")}')
+    return sorted_contours[0]
 
 
 def edge_detection(image, debug=False):
@@ -38,11 +39,16 @@ def edge_detection(image, debug=False):
         show_image("Prepared Image", prepped_image)
 
     contours = cv2.findContours(prepped_image.copy(), cv2.RETR_EXTERNAL,
-                            cv2.CHAIN_APPROX_SIMPLE)
+                                cv2.CHAIN_APPROX_SIMPLE)
     grabbed_contours = grab_contours(contours)
-    sorted_contours = sorted(grabbed_contours, key=cv2.contourArea, reverse=True)
+
+    longest_contour = filter_and_sort_contours(grabbed_contours, debug)
+    rect = cv2.minAreaRect(longest_contour.get('contour'))
+    box = cv2.boxPoints(rect)
+    box = np.int0(box)
 
     if debug:
-        cv2.drawContours(image, [sorted_contours[0]], -1, (0, 255, 0), 2)
-        show_image("Contour", image)
-    return filter_contours(sorted_contours)
+        cv2.drawContours(image, [box], -1, (0, 255, 0), 2)
+        show_image("Longest Contour", image)
+
+    return box
