@@ -37,12 +37,16 @@ def scan_bon(path, debug=False):
     if debug:
         show_image("Receipt", bon)
 
-    colored_bon = cv2.cvtColor(bon, cv2.COLOR_BGR2RGB)  # COLOR_BGR2GRAY
-    reduced_noise = cv2.fastNlMeansDenoising(colored_bon)
-    show_image('No noise', reduced_noise)
+    colored_bon = cv2.cvtColor(bon, cv2.COLOR_BGR2GRAY)  # COLOR_BGR2RGB
+
+    kernel = np.ones((5, 5), np.uint8)
+    img_erosion = cv2.erode(reduced_noise, kernel, iterations=1)
+
+    if debug:
+        show_image("Erosion", img_erosion)
 
     options = "--psm 4"
-    text = pytesseract.image_to_string(reduced_noise, config=options, lang='eng+deu')
+    text = pytesseract.image_to_string(img_erosion, config=options, lang='eng+deu')
 
     # show the raw output of the OCR process
     print("[INFO] raw output:")
